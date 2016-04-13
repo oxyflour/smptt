@@ -1,0 +1,19 @@
+{
+  "name": "smptt",
+  "version": "0.0.1",
+  "description": "simple multi-path TCP tunnel",
+  "main": "index.js",
+  "bin": {
+    "smptt": "cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxyflour/smptt.git"
+  },
+  "keywords": [],
+  "author": "oxyflour <oxyflour@hotmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^2.9.0"
+  }
+}
