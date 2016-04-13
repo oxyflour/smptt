@@ -24,6 +24,7 @@ function Sender(addrs) {
 		}
 		while (conn && !conn.ended && conn.bufferedData[conn.expectedIndex]) {
 			conn.write(conn.bufferedData[conn.expectedIndex])
+			delete conn.bufferedData[conn.expectedIndex]
 			conn.expectedIndex ++
 		}
 	}
