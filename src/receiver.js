@@ -21,8 +21,13 @@ function Receiver(target) {
 			conn.bufferedData[packIndex] = buffer
 			conn.lastActive = Date.now()
 		}
-		while (conn && !conn.ended && conn.bufferedData[conn.expectedIndex]) {
-			conn.write(conn.bufferedData[conn.expectedIndex])
+		while (conn && conn.bufferedData[conn.expectedIndex]) {
+			try {
+				conn.write(conn.bufferedData[conn.expectedIndex])
+			}
+			catch (e) {
+				console.log('[R] connection #' + connId + ' already closed')
+			}
 			delete conn.bufferedData[conn.expectedIndex]
 			conn.expectedIndex ++
 		}
@@ -32,13 +37,17 @@ function Receiver(target) {
 	function sendViaPeer(connId, packIndex, buffer) {
 		var list = peers[connId],
 			peer = list && list[ Math.floor(Math.random() * list.length) ]
-		if (peer)
+		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
+		} catch (e) {
+			console.log('[S] peer closed when forwarding #' + connId)
+		}
 		return peer
 	}
 
 	function addConn(connId, conn) {
-		console.log('[R] create new connection #' + connId.toString(16))
+		console.log('[R] create new connection #' + connId.toString(16) +
+			' (current ' + Object.keys(conns).length + ')')
 
 		var packIndex = 1
 
@@ -49,8 +58,6 @@ function Receiver(target) {
 		})
 
 		conn.once('end', _ => {
-			conn.ended = true
-
 			if (!conn.endedByRemote)
 				sendViaPeer(connId, 0, new Buffer(0))
 
@@ -88,6 +95,7 @@ function Receiver(target) {
 					dispatchToConn(data.connId, data.packIndex, data.buffer)
 				}
 				else if (conn) {
+					console.log('[R] connection #' + data.connId + ' closed by remote')
 					conn.endedByRemote = true
 					conn.end()
 				}
