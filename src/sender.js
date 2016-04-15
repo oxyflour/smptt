@@ -2,14 +2,18 @@ var tls = require('tls'),
 	net = require('net'),
 	protocol = require('./protocol')
 
-function Sender(addrs) {
+function Sender(addrs, options) {
 	var peers = [ /* sock[] */ ],
 		conns = { /* connId -> conn */ }
+
+	options = Object.assign({
+		connectionTimeout: 30000,
+	}, options)
 
 	function checkTimeout() {
 		var now = Date.now()
 		Object.keys(conns).forEach(connId => {
-			if (!(now - conns[connId].lastActive < 30000)) {
+			if (!(now - conns[connId].lastActive < options.connectionTimeout)) {
 				console.log('[S] connection #' + connId + ' timeout')
 				conns[connId].destroy()
 			}
@@ -38,8 +42,8 @@ function Sender(addrs) {
 
 	function sendViaPeer(connId, packIndex, buffer) {
 		var connected = peers.filter(p => p.connected),
-			list = connected.length ? connected : peers,
-			peer = list[ Math.floor(Math.random() * list.length) ]
+			socks = connected.length ? connected : peers,
+			peer = socks[ Math.floor(Math.random() * socks.length) ]
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
 		} catch (e) {
@@ -99,7 +103,7 @@ function Sender(addrs) {
 
 		var buffer = new Buffer(0)
 		sock.on('data', buf => {
-			buffer = Buffer.concat([buffer, buf])
+			buffer = Buffer.concat([buffer, buf], buffer.length + buf.length)
 
 			var data
 			while (data = protocol.unpack(buffer)) {

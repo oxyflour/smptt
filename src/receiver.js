@@ -1,18 +1,40 @@
 var net = require('net'),
 	protocol = require('./protocol')
 
-function Receiver(target) {
+function Receiver(target, options) {
 	var peers = { /* connId -> sock[] */ },
 		conns = { /* connId -> conn */ }
+
+	options = Object.assign({
+		connectionTimeout: 30000,
+		maxPeerBufferSize: 1 * 1024 * 1024,
+		throttleInterval: 20,
+	}, options)
 
 	function checkoutTimeout() {
 		var now = Date.now()
 		Object.keys(conns).forEach(connId => {
-			if (!(now - conns[connId].lastActive < 30000)) {
+			if (!(now - conns[connId].lastActive < options.connectionTimeout)) {
 				console.log('[R] connection #' + connId.toString(16) + ' timeout')
 				conns[connId].destroy()
 			}
 		})
+	}
+
+	function throttleStreamFromConnToPeer(connId) {
+		var conn = conns[connId],
+			socks = peers[connId]
+		if (conn && socks) {
+			if (socks.every(sock => sock.bufferSize > options.maxPeerBufferSize)) {
+				conn.paused = true
+				conn.pause()
+				setTimeout(_ => throttleStreamFromConnToPeer(connId), options.throttleInterval)
+			}
+			else {
+				conn.paused = false
+				conn.resume()
+			}
+		}
 	}
 
 	function dispatchToConn(connId, packIndex, buffer) {
@@ -44,6 +66,8 @@ function Receiver(target) {
 		} catch (e) {
 			console.log('[R] write to peer failed when forwarding #' + connId.toString(16))
 		}
+		if (peer && peer.bufferSize > options.maxPeerBufferSize)
+			throttleStreamFromConnToPeer(connId)
 		return peer
 	}
 
