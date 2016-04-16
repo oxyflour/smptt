@@ -18,7 +18,7 @@ program
 	.parse(process.argv)
 
 var tlsOpts = {
-	withTLS: program.key && program.cert && program.ca,
+	withTLS: program.key || program.cert || program.ca,
 	key: program.key && fs.readFileSync(program.key),
 	cert: program.cert && fs.readFileSync(program.cert),
 	ca: program.ca && fs.readFileSync(program.ca),
@@ -40,11 +40,7 @@ function parseAddr(addr, ext) {
 	}
 }
 
-if (program.port.length === 0) {
-	console.log('at least one port number is required')
-	process.exit(-1)
-}
-else if (tlsOpts.withTLS && (!tlsOpts.key || !tlsOpts.cert || !tlsOpts.ca)) {
+if (tlsOpts.withTLS && (!tlsOpts.key || !tlsOpts.cert || !tlsOpts.ca)) {
 	console.log('key, cert and ca files are required when using tls')
 	process.exit(-1)
 }
