@@ -87,7 +87,7 @@ function Receiver(target, options) {
 
 		conn.once('close', _ => {
 			if (!conn.endedByRemote) {
-				console.log('[R] close remote connection #' + connId.toString(16))
+				console.log('[R] closing remote connection #' + connId.toString(16))
 				sendViaPeer(connId, 0, new Buffer(0))
 			}
 
@@ -121,10 +121,9 @@ function Receiver(target, options) {
 		var buffer = new Buffer(0)
 
 		sock.on('data', buf => {
-			buffer = Buffer.concat([buffer, buf], buffer.length + buf.length)
-
-			var data
-			while (data = protocol.unpack(buffer)) {
+			var unpacked = protocol.unpack(Buffer.concat([buffer, buf]))
+			
+			unpacked.packages.forEach(data => {
 				var list = peers[data.connId] || (peers[data.connId] = [ ])
 				if (list.indexOf(sock) === -1) list.push(sock)
 
@@ -141,9 +140,9 @@ function Receiver(target, options) {
 				else {
 					console.log('[R] ignoring package to #' + data.connId.toString(16))
 				}
+			})
 
-				buffer = data.rest
-			}
+			buffer = unpacked.rest
 		})
 
 		sock.once('close', _ => {

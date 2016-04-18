@@ -68,7 +68,7 @@ function Sender(addrs, options) {
 
 		conn.once('close', _ => {
 			if (!conn.endedByRemote) {
-				console.log('[S] close remote connection #' + connId.toString(16))
+				console.log('[S] closing remote connection #' + connId.toString(16))
 				sendViaPeer(connId, 0, new Buffer(0))
 			}
 
@@ -103,10 +103,9 @@ function Sender(addrs, options) {
 
 		var buffer = new Buffer(0)
 		sock.on('data', buf => {
-			buffer = Buffer.concat([buffer, buf], buffer.length + buf.length)
+			var unpacked = protocol.unpack(Buffer.concat([buffer, buf]))
 
-			var data
-			while (data = protocol.unpack(buffer)) {
+			unpacked.packages.forEach(data => {
 				var conn = conns[data.connId]
 				if (conn && data.packIndex > 0) {
 					dispatchToConn(data.connId, data.packIndex, data.buffer)
@@ -120,9 +119,9 @@ function Sender(addrs, options) {
 					console.log('[S] ignoring package to #' + data.connId.toString(16) +
 						':' + data.packIndex + ', ' + data.buffer.length + 'bytes')
 				}
+			})
 
-				buffer = data.rest
-			}
+			buffer = unpacked.rest
 		})
 
 		sock.once('close', _ => {
@@ -141,7 +140,7 @@ function Sender(addrs, options) {
 
 	addrs.forEach(addPeer)
 
-	return conn => addConn(Math.floor(Math.random() * 0x0fffffff), conn)
+	return conn => addConn(Math.floor(Math.random() * 0xffffffff), conn)
 }
 
 module.exports = Sender
