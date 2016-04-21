@@ -12,20 +12,20 @@ program
 	.option('-p, --port <number>', 'port number, required', (r, p) => p.concat(parseInt(r)), [ ])
 	.option('-P, --peer [addr]', 'peer address like localhost:8081, required as sender', (r, p) => p.concat(r), [ ])
 	.option('-t, --target <addr>', 'target address like localhost:8082, required as receiver')
-	.option('--key <file>', 'ssl key file, required when using tls')
-	.option('--cert <file>', 'ssl crt file, required when using tls')
-	.option('--ca <file>', 'ca crt file, required when using tls')
+	.option('--ca <file>', 'ca crt file, required when using tls', (r, p) => p.concat(r), [ ])
+	.option('--key <file>', 'ssl key file, optional when using tls')
+	.option('--cert <file>', 'ssl crt file, optional when using tls')
 	.parse(process.argv)
 
 var tlsOpts = {
-	withTLS: program.key || program.cert || program.ca,
+	withTLS: program.ca.length > 0,
 	key: program.key && fs.readFileSync(program.key),
 	cert: program.cert && fs.readFileSync(program.cert),
-	ca: program.ca && fs.readFileSync(program.ca),
+	ca: program.ca.length && program.ca.map(c => fs.readFileSync(c)),
 }
 
 function parseAddr(addr, ext) {
-	var st = addr.split(':')
+	var st = +addr === addr ? ['localhost', addr] : addr.split(':')
 	return {
 		host: st[0] || 'localhost',
 		port: parseInt(st[1] || 8080),
@@ -36,15 +36,11 @@ function parseAddr(addr, ext) {
 		ca: tlsOpts.ca,
 
 		requestCert: true,
-		rejectUnauthorized: true,
+		rejectUnauthorized: false,
 	}
 }
 
-if (tlsOpts.withTLS && (!tlsOpts.key || !tlsOpts.cert || !tlsOpts.ca)) {
-	console.log('key, cert and ca files are required when using tls')
-	process.exit(-1)
-}
-else if (program.port.length && program.peer.length && !program.target) {
+if (program.port.length && program.peer.length && !program.target) {
 	console.log('starting as sender at port ' + program.port.join(', '))
 
 	var handler = new smptt.Sender(program.peer.map(parseAddr))
