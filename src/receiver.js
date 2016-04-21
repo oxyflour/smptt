@@ -7,11 +7,12 @@ function Receiver(target, options) {
 
 	options = Object.assign({
 		connectionTimeout: 30000,
+		maxPackIndexDelay: 100,
 		maxPeerBufferSize: 1 * 1024 * 1024,
 		throttleInterval: 20,
 	}, options)
 
-	function checkoutTimeout() {
+	function checkTimeout() {
 		var now = Date.now()
 		Object.keys(conns).forEach(connId => {
 			if (!(now - conns[connId].lastActive < options.connectionTimeout)) {
@@ -39,10 +40,17 @@ function Receiver(target, options) {
 
 	function dispatchToConn(connId, packIndex, buffer) {
 		var conn = conns[connId]
+
 		if (conn) {
 			conn.bufferedData[packIndex] = buffer
 			conn.lastActive = Date.now()
 		}
+
+		if (conn && packIndex - conn.expectedIndex > options.maxPackIndexDelay) {
+			console.log('[R] package #' + connId.toString(16) + ':' +
+				conn.expectedIndex + ' seems too later...')
+		}
+
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
 			var buf = conn.bufferedData[conn.expectedIndex]
 			try {
@@ -55,19 +63,24 @@ function Receiver(target, options) {
 			delete conn.bufferedData[conn.expectedIndex]
 			conn.expectedIndex ++
 		}
+
 		return conn
 	}
 
 	function sendViaPeer(connId, packIndex, buffer) {
 		var list = peers[connId],
 			peer = list && list[ Math.floor(Math.random() * list.length) ]
+
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
 		} catch (e) {
 			console.log('[R] write to peer failed when forwarding #' + connId.toString(16))
 		}
-		if (peer && peer.bufferSize > options.maxPeerBufferSize)
+
+		if (peer && peer.bufferSize > options.maxPeerBufferSize) {
 			throttleStreamFromConnToPeer(connId)
+		}
+
 		return peer
 	}
 
@@ -110,7 +123,7 @@ function Receiver(target, options) {
 
 		conn.lastActive = Date.now()
 
-		checkoutTimeout()
+		checkTimeout()
 
 		return conns[connId] = conn
 	}
@@ -124,6 +137,8 @@ function Receiver(target, options) {
 			var unpacked = protocol.unpack(Buffer.concat([buffer, buf]))
 			
 			unpacked.packages.forEach(data => {
+				if (data.connId === 0) return
+
 				var list = peers[data.connId] || (peers[data.connId] = [ ])
 				if (list.indexOf(sock) === -1) list.push(sock)
 

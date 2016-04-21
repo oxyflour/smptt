@@ -8,6 +8,8 @@ function Sender(addrs, options) {
 
 	options = Object.assign({
 		connectionTimeout: 30000,
+		maxPackIndexDelay: 100,
+		keepAliveInterval: 2000,
 	}, options)
 
 	function checkTimeout() {
@@ -20,12 +22,31 @@ function Sender(addrs, options) {
 		})
 	}
 
+	function keepPeerAlive() {
+		peers.forEach(peer => {
+			try {
+				// set connId = 0
+				peer.write(protocol.pack(0, 0, new Buffer(0)))
+			}
+			catch (e) {
+				console.log('[S] write to peer failed when pinging #' + connId.toString(16))
+			}
+		})
+	}
+
 	function dispatchToConn(connId, packIndex, buffer) {
 		var conn = conns[connId]
+
 		if (conn) {
 			conn.bufferedData[packIndex] = buffer
 			conn.lastActive = Date.now()
 		}
+
+		if (conn && packIndex - conn.expectedIndex > options.maxPackIndexDelay) {
+			console.log('[S] package #' + connId.toString(16) + ':' +
+				conn.expectedIndex + ' seems too later...')
+		}
+
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
 			var buf = conn.bufferedData[conn.expectedIndex]
 			try {
@@ -38,17 +59,21 @@ function Sender(addrs, options) {
 			delete conn.bufferedData[conn.expectedIndex]
 			conn.expectedIndex ++
 		}
+
+		return conn
 	}
 
 	function sendViaPeer(connId, packIndex, buffer) {
 		var connected = peers.filter(p => p.connected),
 			socks = connected.length ? connected : peers,
 			peer = socks[ Math.floor(Math.random() * socks.length) ]
+
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
 		} catch (e) {
 			console.log('[S] write to peer failed when forwarding #' + connId.toString(16))
 		}
+
 		return peer
 	}
 
@@ -139,6 +164,9 @@ function Sender(addrs, options) {
 	}
 
 	addrs.forEach(addPeer)
+
+	if (options.keepAliveInterval > 0)
+		setInterval(keepPeerAlive, options.keepAliveInterval)
 
 	return conn => addConn(Math.floor(Math.random() * 0xffffffff), conn)
 }
