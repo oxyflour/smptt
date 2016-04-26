@@ -66,7 +66,7 @@ function Sender(addrs, options) {
 	function sendViaPeer(connId, packIndex, buffer) {
 		var connected = peers.filter(p => p.connected),
 			socks = connected.length ? connected : peers,
-			peer = socks[ Math.floor(Math.random() * socks.length) ]
+			peer = socks.sort((a, b) => a.bufferSize - b.bufferSize)[0]
 
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))

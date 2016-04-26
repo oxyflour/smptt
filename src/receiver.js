@@ -68,8 +68,8 @@ function Receiver(target, options) {
 	}
 
 	function sendViaPeer(connId, packIndex, buffer) {
-		var list = peers[connId],
-			peer = list && list[ Math.floor(Math.random() * list.length) ]
+		var socks = peers[connId],
+			peer = socks && socks.sort((a, b) => a.bufferSize - b.bufferSize)[0]
 
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
@@ -139,8 +139,8 @@ function Receiver(target, options) {
 			unpacked.packages.forEach(data => {
 				if (data.connId === 0) return
 
-				var list = peers[data.connId] || (peers[data.connId] = [ ])
-				if (list.indexOf(sock) === -1) list.push(sock)
+				var socks = peers[data.connId] || (peers[data.connId] = [ ])
+				if (socks.indexOf(sock) === -1) socks.push(sock)
 
 				var conn = conns[data.connId] ||
 					addConn(data.connId, net.connect(target))
