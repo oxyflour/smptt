@@ -156,8 +156,8 @@ function Sender(addrs, options) {
 			addPeer(addr, index)
 		})
 
-		sock.once('error', _ => {
-			console.log('[S] peer error at addr' + index)
+		sock.once('error', e => {
+			console.log('[S] peer error at addr' + index + ' (' + e.message + ')')
 		})
 
 		return peers[index] = sock
