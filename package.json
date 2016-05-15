@@ -1,6 +1,6 @@
 {
   "name": "smptt",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "simple multi-path TCP tunnel",
   "main": "index.js",
   "bin": {
