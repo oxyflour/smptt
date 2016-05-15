@@ -9,7 +9,7 @@ var net = require('net'),
 
 program
 	.version(package.version)
-	.option('-p, --port <number>', 'listen port, required', (r, p) => p.concat(parseInt(, 10)(r)), [ ])
+	.option('-p, --port <number>', 'listen port, required', (r, p) => p.concat(parseInt(r)), [ ])
 	.option('-P, --peer <addr>', 'peer address or port, required as sender', (r, p) => p.concat(r), [ ])
 	.option('-t, --target <addr>', 'target address, required as receiver')
 	.option('--pfx <file>', 'pfx file containning ca/crt/key, required to use tls')
