@@ -8,10 +8,11 @@ simple multi-path TCP tunnel
 
     -h, --help           output usage information
     -V, --version        output the version number
-    -p, --port <number>  port number, required
-    -P, --peer <addr>    peer address like localhost:8081, required as sender
-    -t, --target <addr>  target address like localhost:8082, required as receiver
+    -p, --port <number>  listen port, required
+    -P, --peer <addr>    peer address or port, required as sender
+    -t, --target <addr>  target address, required as receiver
     --pfx <file>         pfx file containning ca/crt/key, required to use tls
+
 ```
 
 ## Examples
