@@ -37,14 +37,14 @@ if (program.port.length && program.peer.length && !program.target) {
 
 	var useTLS = addr => tlsOpts.withTLS ? Object.assign(addr, tlsOpts) : addr,
 		handler = new smptt.Sender(program.peer.map(parseAddr).map(useTLS))
-	program.port.forEach(port => net.createServer(handler).listen(parseAddr(port)))
+	program.port.forEach(port => net.createServer(handler).listen(port))
 }
 else if (program.port.length && program.target && !program.peer.length) {
 	console.log('starting as receiver at port ' + program.port.join(', '))
 
 	var handler = new smptt.Receiver(parseAddr(program.target)),
 		server = _ => tlsOpts.withTLS ? tls.createServer(tlsOpts, handler) : net.createServer(handler)
-	program.port.forEach(port => server().listen(parseAddr(port)))
+	program.port.forEach(port => server().listen(port))
 }
 else {
 	program.outputHelp()
