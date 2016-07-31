@@ -11,7 +11,6 @@ function Receiver(target, options) {
 		maxPeerBufferSize: 1 * 1024 * 1024,
 		minPeerBufferSize: 256 * 1024,
 		throttleInterval: 20,
-		dispatchMethod: 'random'
 	}, options)
 
 	function checkTimeout() {
@@ -22,13 +21,6 @@ function Receiver(target, options) {
 				conns[connId].destroy()
 			}
 		})
-	}
-
-	function selectPeer(socks) {
-		if (options.dispatchMethod === 'bufferSize')
-			return socks.sort((a, b) => a.bufferSize - b.bufferSize)[0]
-		else
-			return socks[Math.floor(Math.random() * socks.length)]
 	}
 
 	function throttleStreamFromConnToPeer() {
@@ -83,7 +75,7 @@ function Receiver(target, options) {
 
 	function sendViaPeer(connId, packIndex, buffer) {
 		var socks = peers[connId],
-			peer = socks && selectPeer(socks)
+			peer = socks && socks.sort((a, b) => a.bufferSize - b.bufferSize)[0]
 
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
