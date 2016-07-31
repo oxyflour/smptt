@@ -74,7 +74,7 @@ function Sender(addrs, options) {
 			console.log('[S] write to peer failed when forwarding #' + connId.toString(16))
 		}
 
-		return peer
+		return socks.indexOf(peer)
 	}
 
 	function addConn(connId, conn) {
