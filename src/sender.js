@@ -23,22 +23,22 @@ function Sender(addrs, options) {
 	}
 
 	function keepPeerAlive() {
-		peers.forEach(peer => {
+		peers.forEach((peer, index) => {
 			try {
 				// set connId = 0
 				peer.write(protocol.pack(0, 0, new Buffer(0)))
 			}
 			catch (e) {
-				console.log('[S] write to peer failed when pinging #' + connId.toString(16))
+				console.log('[S] write to peer failed when pinging #' + index)
 			}
 		})
 	}
 
-	function dispatchToConn(connId, packIndex, buffer) {
+	function dispatchToConn(connId, packIndex, buffer, peerIndex) {
 		var conn = conns[connId]
 
 		if (conn) {
-			conn.bufferedData[packIndex] = buffer
+			conn.bufferedData[packIndex] = { buffer, peerIndex }
 			conn.lastActive = Date.now()
 		}
 
@@ -48,10 +48,10 @@ function Sender(addrs, options) {
 		}
 
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
-			var buf = conn.bufferedData[conn.expectedIndex]
+			var data = conn.bufferedData[conn.expectedIndex]
 			try {
-				conn.write(buf)
-				conn.bytesRecv += buf.length
+				conn.write(data.buffer)
+				conn.bytesRecv[data.peerIndex] += data.buffer.length
 			}
 			catch (e) {
 				console.log('[S] write to connection #' + connId.toString(16) + ' failed')
@@ -80,12 +80,15 @@ function Sender(addrs, options) {
 	function addConn(connId, conn) {
 		console.log('[S] accept new connection #' + connId.toString(16) + ' (' + Object.keys(conns).length + ')')
 
+		peers.forEach(peer => peer.write(protocol.pack(connId, 0xffffffff, new Buffer(0))))
+
 		var packIndex = 1
 
 		conn.on('data', buf => {
-			if (sendViaPeer(connId, packIndex, buf)) {
+			var peerIndex = sendViaPeer(connId, packIndex, buf)
+			if (peerIndex >= 0) {
 				packIndex ++
-				conn.bytesSent += buf.length
+				conn.bytesSent[peerIndex] += buf.length
 			}
 
 			conn.lastActive = Date.now()
@@ -100,7 +103,7 @@ function Sender(addrs, options) {
 			delete conns[connId]
 
 			console.log('[S] close connection #' + connId.toString(16) +
-				' (sent: ' + conn.bytesSent +', recv :' + conn.bytesRecv + ')')
+				' (sent: ' + conn.bytesSent.join('/') +', recv: ' + conn.bytesRecv.join('/') + ')')
 		})
 
 		conn.once('error', _ => {
@@ -110,8 +113,8 @@ function Sender(addrs, options) {
 		conn.expectedIndex = packIndex
 		conn.bufferedData = { }
 
-		conn.bytesSent = 0
-		conn.bytesRecv = 0
+		conn.bytesSent = peers.map(_ => 0)
+		conn.bytesRecv = peers.map(_ => 0)
 
 		conn.lastActive = Date.now()
 
@@ -133,7 +136,7 @@ function Sender(addrs, options) {
 			unpacked.packages.forEach(data => {
 				var conn = conns[data.connId]
 				if (conn && data.packIndex > 0) {
-					dispatchToConn(data.connId, data.packIndex, data.buffer)
+					dispatchToConn(data.connId, data.packIndex, data.buffer, index)
 				}
 				else if (conn) {
 					console.log('[S] connection #' + data.connId.toString(16) + ' closed by remote')
@@ -153,7 +156,7 @@ function Sender(addrs, options) {
 			console.log('[S] peer disconnected from addr' + index)
 
 			// keep the peer always available
-			addPeer(addr, index)
+			setTimeout(_ => addPeer(addr, index), 200)
 		})
 
 		sock.once('error', e => {

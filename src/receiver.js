@@ -9,6 +9,7 @@ function Receiver(target, options) {
 		connectionTimeout: 30000,
 		maxPackIndexDelay: 100,
 		maxPeerBufferSize: 1 * 1024 * 1024,
+		minPeerBufferSize: 256 * 1024,
 		throttleInterval: 20,
 		dispatchMethod: 'random'
 	}, options)
@@ -30,23 +31,28 @@ function Receiver(target, options) {
 			return socks[Math.floor(Math.random() * socks.length)]
 	}
 
-	function throttleStreamFromConnToPeer(connId) {
-		var conn = conns[connId],
-			socks = peers[connId]
-		if (conn && socks) {
-			if (socks.every(sock => sock.bufferSize > options.maxPeerBufferSize)) {
-				conn.paused = true
-				conn.pause()
-				setTimeout(_ => throttleStreamFromConnToPeer(connId), options.throttleInterval)
+	function throttleStreamFromConnToPeer() {
+		Object.keys(conns).map(connId => {
+			var conn = conns[connId],
+				socks = peers[connId]
+			if (conn && socks) {
+				if (socks.every(sock => sock.bufferSize > options.maxPeerBufferSize)) {
+					if (!conn.paused) {
+						conn.paused = true
+						conn.pause()
+					}
+				}
+				else if (socks.some(sock => sock.bufferSize < options.minPeerBufferSize)) {
+					if (conn.paused) {
+						conn.paused = false
+						conn.resume()
+					}
+				}
 			}
-			else {
-				conn.paused = false
-				conn.resume()
-			}
-		}
+		})
 	}
 
-	function dispatchToConn(connId, packIndex, buffer) {
+	function dispatchToConn(connId, packIndex, buffer, peerIndex) {
 		var conn = conns[connId]
 
 		if (conn) {
@@ -63,7 +69,7 @@ function Receiver(target, options) {
 			var buf = conn.bufferedData[conn.expectedIndex]
 			try {
 				conn.write(buf)
-				conn.bytesRecv += buf.length
+				conn.bytesRecv[peerIndex] = (conn.bytesRecv[peerIndex] || 0) + buf.length
 			}
 			catch (e) {
 				console.log('[R] write to connection #' + connId.toString(16) + ' failed')
@@ -85,11 +91,7 @@ function Receiver(target, options) {
 			console.log('[R] write to peer failed when forwarding #' + connId.toString(16))
 		}
 
-		if (peer && peer.bufferSize > options.maxPeerBufferSize) {
-			throttleStreamFromConnToPeer(connId)
-		}
-
-		return peer
+		return peer && peer.peerIndex
 	}
 
 	function addConn(connId, conn) {
@@ -98,9 +100,10 @@ function Receiver(target, options) {
 		var packIndex = 1
 
 		conn.on('data', buf => {
-			if (sendViaPeer(connId, packIndex, buf)) {
+			var peerIndex = sendViaPeer(connId, packIndex, buf)
+			if (peerIndex >= 0) {
 				packIndex ++
-				conn.bytesSent += buf.length
+				conn.bytesSent[peerIndex] = (conn.bytesSent[peerIndex] || 0) + buf.length
 			}
 
 			conn.lastActive = Date.now()
@@ -115,8 +118,10 @@ function Receiver(target, options) {
 			delete conns[connId]
 			delete peers[connId]
 
+			var vals = obj => Object.keys(obj).map(key => obj[key])
 			console.log('[R] destroy connection #' + connId.toString(16) +
-				' (sent: ' + conn.bytesSent +', recv :' + conn.bytesRecv + ')')
+				' (sent: ' + (vals(conn.bytesSent).join('/') || 0) +
+				', recv: ' + (vals(conn.bytesRecv).join('/') || 0) + ')')
 		})
 
 		conn.once('error', _ => {
@@ -126,8 +131,8 @@ function Receiver(target, options) {
 		conn.expectedIndex = packIndex
 		conn.bufferedData = { }
 
-		conn.bytesSent = 0
-		conn.bytesRecv = 0
+		conn.bytesSent = { }
+		conn.bytesRecv = { }
 
 		conn.lastActive = Date.now()
 
@@ -137,6 +142,8 @@ function Receiver(target, options) {
 	}
 
 	function addPeer(sock) {
+		sock.peerIndex = Math.floor(Math.random() * 0xffffffff)
+
 		console.log('[R] peer connected')
 
 		var buffer = new Buffer(0)
@@ -153,7 +160,10 @@ function Receiver(target, options) {
 				var conn = conns[data.connId] ||
 					addConn(data.connId, net.connect(target))
 				if (conn && data.packIndex > 0) {
-					dispatchToConn(data.connId, data.packIndex, data.buffer)
+					dispatchToConn(data.connId, data.packIndex, data.buffer, sock.peerIndex)
+				}
+				else if (conn && data.packIndex === 0xffffffff) {
+					// do nothing
 				}
 				else if (conn) {
 					console.log('[R] connection #' + data.connId + ' closed by remote')
@@ -182,6 +192,9 @@ function Receiver(target, options) {
 
 		return sock
 	}
+
+	if (options.throttleInterval)
+		setInterval(throttleStreamFromConnToPeer, options.throttleInterval)
 
 	return addPeer
 }
