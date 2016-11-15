@@ -15,9 +15,11 @@ function Receiver(target, options) {
 	function checkTimeout() {
 		var now = Date.now()
 		Object.keys(conns).forEach(connId => {
-			if (!(now - conns[connId].lastActive < options.connectionTimeout)) {
-				console.log('[R] connection #' + connId.toString(16) + ' timeout')
-				conns[connId].destroy()
+			var conn = conns[connId]
+			if (!(now - conn.lastActive < options.connectionTimeout)) {
+				console.log('[R] connection #' + connId + ' timeout, ' +
+					Object.keys(conn.bufferedData).length + ' packages pending')
+				conn.destroy()
 			}
 		})
 	}
@@ -49,11 +51,6 @@ function Receiver(target, options) {
 		if (conn) {
 			conn.bufferedData[packIndex] = buffer
 			conn.lastActive = Date.now()
-		}
-
-		if (conn && packIndex - conn.expectedIndex > options.maxPackIndexDelay) {
-			console.log('[R] package #' + connId.toString(16) + ':' +
-				conn.expectedIndex + ' seems too later...')
 		}
 
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
@@ -112,8 +109,8 @@ function Receiver(target, options) {
 
 			var vals = obj => Object.keys(obj).map(key => obj[key])
 			console.log('[R] destroy connection #' + connId.toString(16) +
-				' (sent: ' + (vals(conn.bytesSent).join('/') || 0) +
-				', recv: ' + (vals(conn.bytesRecv).join('/') || 0) + ')')
+				' (recv: ' + (vals(conn.bytesRecv).join('/') || 0) +
+				', sent: ' + (vals(conn.bytesSent).join('/') || 0) + ')')
 		})
 
 		conn.once('error', _ => {
@@ -163,7 +160,8 @@ function Receiver(target, options) {
 					conn.destroy()
 				}
 				else {
-					console.log('[R] ignoring package to #' + data.connId.toString(16))
+					console.log('[R] ignoring package to #' + data.connId.toString(16) +
+						':' + data.packIndex + ' (' + data.buffer.length + 'bytes)')
 				}
 			})
 

@@ -8,16 +8,17 @@ function Sender(addrs, options) {
 
 	options = Object.assign({
 		connectionTimeout: 30000,
-		maxPackIndexDelay: 100,
 		keepAliveInterval: 2000,
 	}, options)
 
 	function checkTimeout() {
 		var now = Date.now()
 		Object.keys(conns).forEach(connId => {
-			if (!(now - conns[connId].lastActive < options.connectionTimeout)) {
-				console.log('[S] connection #' + connId + ' timeout')
-				conns[connId].destroy()
+			var conn = conns[connId]
+			if (!(now - conn.lastActive < options.connectionTimeout)) {
+				console.log('[S] connection #' + connId + ' timeout, ' +
+					Object.keys(conn.bufferedData).length + ' packages pending')
+				conn.destroy()
 			}
 		})
 	}
@@ -40,11 +41,6 @@ function Sender(addrs, options) {
 		if (conn) {
 			conn.bufferedData[packIndex] = { buffer, peerIndex }
 			conn.lastActive = Date.now()
-		}
-
-		if (conn && packIndex - conn.expectedIndex > options.maxPackIndexDelay) {
-			console.log('[S] package #' + connId.toString(16) + ':' +
-				conn.expectedIndex + ' seems too later...')
 		}
 
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
@@ -146,7 +142,7 @@ function Sender(addrs, options) {
 				}
 				else {
 					console.log('[S] ignoring package to #' + data.connId.toString(16) +
-						':' + data.packIndex + ', ' + data.buffer.length + 'bytes')
+						':' + data.packIndex + ' (' + data.buffer.length + 'bytes)')
 				}
 			})
 
