@@ -7,7 +7,6 @@ function Receiver(target, options) {
 
 	options = Object.assign({
 		connectionTimeout: 30000,
-		maxPackIndexDelay: 100,
 		maxPeerBufferSize: 1 * 1024 * 1024,
 		minPeerBufferSize: 256 * 1024,
 		throttleInterval: 20,
@@ -74,8 +73,9 @@ function Receiver(target, options) {
 	}
 
 	function sendViaPeer(connId, packIndex, buffer) {
-		var socks = peers[connId],
-			peer = socks && socks.sort((a, b) => a.bufferSize - b.bufferSize)[0]
+		var socks = peers[connId] || [ ],
+			pairs = socks.map(s => [s, s.bufferSize + Math.random()]),
+			peer = pairs.sort((a, b) => a[1] - b[1])[0][0]
 
 		if (peer) try {
 			peer.write(protocol.pack(connId, packIndex, buffer))
