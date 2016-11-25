@@ -77,6 +77,7 @@ function Sender(addrs, options) {
 	function addConn(connId, conn) {
 		console.log('[S] accept new connection #' + connId.toString(16) + ' (' + Object.keys(conns).length + ')')
 
+		// notify the receiver which peers are active
 		peers.forEach(peer => peer.write(protocol.pack(connId, 0xffffffff, new Buffer(0))))
 
 		var packIndex = 1
@@ -131,6 +132,8 @@ function Sender(addrs, options) {
 			var unpacked = protocol.unpack(Buffer.concat([buffer, buf]))
 
 			unpacked.packages.forEach(data => {
+				if (data.connId === 0) return
+
 				var conn = conns[data.connId]
 				if (conn && data.packIndex > 0) {
 					dispatchToConn(data.connId, data.packIndex, data.buffer, index)
@@ -165,8 +168,9 @@ function Sender(addrs, options) {
 
 	addrs.forEach(addPeer)
 
-	if (options.keepAliveInterval > 0)
+	if (options.keepAliveInterval > 0) {
 		setInterval(keepPeerAlive, options.keepAliveInterval)
+	}
 
 	return conn => addConn(Math.floor(Math.random() * 0xffffffff), conn)
 }

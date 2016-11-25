@@ -55,7 +55,7 @@ function Receiver(target, options) {
 
 		while (conn && conn.bufferedData[conn.expectedIndex]) {
 			var buf = conn.bufferedData[conn.expectedIndex]
-			try {
+			if (buf.length) try {
 				conn.write(buf)
 				conn.bytesRecv[peerIndex] = (conn.bytesRecv[peerIndex] || 0) + buf.length
 			}
@@ -146,13 +146,9 @@ function Receiver(target, options) {
 				var socks = peers[data.connId] || (peers[data.connId] = [ ])
 				if (socks.indexOf(sock) === -1) socks.push(sock)
 
-				var conn = conns[data.connId] ||
-					addConn(data.connId, net.connect(target))
+				var conn = conns[data.connId] || addConn(data.connId, net.connect(target))
 				if (conn && data.packIndex > 0) {
 					dispatchToConn(data.connId, data.packIndex, data.buffer, sock.peerIndex)
-				}
-				else if (conn && data.packIndex === 0xffffffff) {
-					// do nothing
 				}
 				else if (conn) {
 					console.log('[R] connection #' + data.connId + ' closed by remote')
@@ -183,8 +179,9 @@ function Receiver(target, options) {
 		return sock
 	}
 
-	if (options.throttleInterval)
+	if (options.throttleInterval) {
 		setInterval(throttleStreamFromConnToPeer, options.throttleInterval)
+	}
 
 	return addPeer
 }

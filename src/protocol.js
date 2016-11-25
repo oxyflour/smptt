@@ -21,7 +21,6 @@ const unpack = function(buf) {
 	if ((readFunc = 'readUInt32LE') && buf[readFunc](0) != MAGIC &&
 		(readFunc = 'readUInt32BE') && buf[readFunc](0) != MAGIC) {
 		throw 'seems not a valid package'
-		return
 	}
 
 	while (1) {
