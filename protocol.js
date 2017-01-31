@@ -1,0 +1,127 @@
+'use strict'
+
+const tls = require('tls'),
+  EventEmitter = require('events'),
+  debug = require('debug')
+
+const MAGIC = 0xabcd,
+  HEAD_LENGTH = 16
+
+const eventMap = { }
+'ping/pong/open/data/req/ack'.split('/').forEach((name, index) => {
+  eventMap[name] = index + 10
+  eventMap[index + 10] = name
+})
+
+function pack(evtId, connId, packId, body) {
+  const head = new Buffer(HEAD_LENGTH)
+  head.writeUInt16LE(MAGIC,  0)
+  head.writeUInt16LE(evtId,  2)
+  head.writeUInt32LE(connId || 0, 4)
+  head.writeUInt32LE(packId || 0, 8)
+  if (body) {
+    head.writeUInt32LE(body.length, 12)
+    return Buffer.concat([head, body], body.length + head.length)
+  }
+  else {
+    head.writeUInt32LE(0, 12)
+    return head
+  }
+}
+
+function unpack(chunk) {
+  const packages = [ ]
+
+  let startLength = 0
+  while (1) {
+    if (chunk.length < startLength + HEAD_LENGTH) {
+      /* head not ready */
+      break
+    }
+
+    if (chunk.readUInt16LE(startLength) !== MAGIC) {
+      startLength ++
+      continue
+    }
+
+    const
+      evtId  = chunk.readUInt16LE(startLength +  2),
+      connId = chunk.readUInt32LE(startLength +  4),
+      packId = chunk.readUInt32LE(startLength +  8),
+      length = chunk.readUInt32LE(startLength + 12)
+
+    if (chunk.length < startLength + HEAD_LENGTH + length) {
+      /* package body not ready */
+      break
+    }
+
+    const body = chunk.slice(startLength + HEAD_LENGTH, startLength + HEAD_LENGTH + length)
+    packages.push({ evtId, connId, packId, body })
+
+    startLength += HEAD_LENGTH + length
+  }
+
+  var rest = startLength === 0 ? chunk : chunk.slice(startLength)
+  return { packages, rest }
+}
+
+function ioSocket(sock) {
+  const emitter = new EventEmitter()
+
+  sock.on('error', err => {
+    emitter.emit('error', err)
+  })
+
+  sock.once('close', _ => {
+    emitter.emit('disconnect')
+  })
+
+  let rest = new Buffer(0)
+  sock.on('data', data => {
+    const unpacked = unpack(Buffer.concat([rest, data]))
+    unpacked.packages.forEach(data => {
+      emitter.emit(eventMap[data.evtId], data)
+    })
+    rest = unpacked.rest
+  })
+
+  return {
+    on(evtName, cb) {
+      emitter.on(evtName, cb)
+    },
+    recv(evtName, cb) {
+      if (!eventMap[evtName]) throw 'invalid event: ' + evtName
+      emitter.on(evtName, evt => cb(evt.connId, evt.packId, evt.body))
+    },
+    send(evtName, connId, packId, body) {
+      if (!eventMap[evtName]) throw 'invalid event: ' + evtName
+      if (typeof body === 'string') body = Buffer.from(body)
+      sock.write(pack(eventMap[evtName], connId, packId, body))
+    },
+    get bufferSize() {
+      return sock.bufferSize
+    },
+    get addrRemote() {
+      return sock.remoteAddress + ':' + sock.remotePort
+    }
+  }
+}
+
+function connect(opts, cb) {
+  const sock = tls.connect(opts)
+  sock.once('connect', _ => {
+    cb(ioSocket(sock))
+  })
+  sock.once('close', _ => {
+    setTimeout(_ => connect(opts, cb), 1000)
+  })
+}
+
+function listen(opts, cb) {
+  const server = tls.createServer(opts, sock => {
+    cb(ioSocket(sock))
+  })
+  server.listen(opts.port, opts.host)
+}
+
+module.exports = { connect, listen }
