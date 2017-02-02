@@ -112,6 +112,9 @@ function connect(opts, cb) {
   sock.once('connect', _ => {
     cb(ioSocket(sock))
   })
+  sock.once('error', err => {
+    console.error(err)
+  })
   sock.once('close', _ => {
     setTimeout(_ => connect(opts, cb), 1000)
   })
