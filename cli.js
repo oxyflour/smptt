@@ -136,8 +136,7 @@ if (program.listen.length) {
         peer.averagePing = peer.lastPings.reduce((a, b) => a + b, 0) / peer.lastPings.length
       })
       peer.recv('open', (id, index, addr) => {
-		    const sock = net.connect(parse(addr.toString()))
-        pool.open(id, sock).add(peer)
+        pool.open(id, addr.toString()).add(peer)
       })
       peer.recv('data', (id, index, body) => {
         pool.has(id) && pool.open(id).recv(index, body, peer)

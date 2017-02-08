@@ -224,6 +224,11 @@ function createPool(opts) {
   function open(id, sock) {
     const key = hex(id)
     if (!conns[key]) {
+      if (typeof sock === 'string') {
+        const st = sock.split(':'),
+          port = +st.pop(), host = st.pop()
+        sock = net.connect({ host, port })
+      }
       conns[key] = createConn(id, sock, opts)
       log('open %s (%d total)', key, Object.keys(conns).length)
     }
