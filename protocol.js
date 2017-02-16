@@ -109,14 +109,27 @@ function ioSocket(sock) {
 
 function connect(opts, cb) {
   const sock = tls.connect(opts)
+
+  let isDestroyed = false
+  function retryConnect() {
+    if (!isDestroyed) {
+      sock.destroy()
+      isDestroyed = true
+      setTimeout(_ => connect(opts, cb), opts.failRetryTimeout || 1000)
+    }
+  }
+
   sock.once('connect', _ => {
+    opts.failRetryTimeout = 1000
     cb(ioSocket(sock))
   })
   sock.once('error', err => {
-    console.error(err)
+    opts.failRetryTimeout = Math.min((opts.failRetryTimeout || 1000) * 2, 30000)
+    console.error(Date.now(), err, `retry in ${opts.failRetryTimeout / 1000} seconds`)
+    retryConnect()
   })
   sock.once('close', _ => {
-    setTimeout(_ => connect(opts, cb), 1000)
+    retryConnect()
   })
 }
 
