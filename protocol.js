@@ -125,7 +125,7 @@ function connect(opts, cb) {
   })
   sock.once('error', err => {
     opts.failRetryTimeout = Math.min((opts.failRetryTimeout || 1000) * 2, 30000)
-    console.error(Date.now(), err, `retry in ${opts.failRetryTimeout / 1000} seconds`)
+    console.error(new Date(), err, `retry in ${opts.failRetryTimeout / 1000} seconds`)
     retryConnect()
   })
   sock.once('close', _ => {
