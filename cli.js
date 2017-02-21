@@ -15,7 +15,7 @@ program
   .option('-l, --listen <[host:]port>', 'listen address, required as server', (r, p) => p.concat(r), [ ])
   .option('--pfx <string>', 'pfx file path, required')
   .option('--idle-timeout <integer>', 'seconds to wait before closing idle connections. default 30s', parseFloat, 30)
-  .option('--ping-interval <integer>', 'seconds to periodically update peer ping. default 5s', parseFloat, 5)
+  .option('--ping-interval <integer>', 'seconds to periodically update peer ping. default 1s', parseFloat, 1)
   .option('--io-flush-interval <integer>', 'milliseconds to flush data, default 5ms', parseFloat, 5)
   .option('--io-max-buffer-size <integer>', 'default 40', parseFloat, 40)
   .option('--io-min-buffer-size <integer>', 'default 30', parseFloat, 30)
@@ -35,11 +35,12 @@ if (!fs.existsSync(program.pfx)) {
 
 const pfx = fs.readFileSync(program.pfx)
 function parse(addr) {
-	const st = addr.split(':')
+	const st = addr.split(':'),
+    port = +st.pop(),
+    host = st.pop(),
+    servername = host
 	return {
-		pfx,
-		port: +st.pop(),
-		host: st.pop(),
+		pfx, port, host, servername,
 		requestCert: true,
 		rejectUnauthorized: true,
 	}
@@ -103,7 +104,11 @@ if (program.peer.length && program.forward.length) {
   })
 
   setInterval(_ => {
-    peers.forEach(peer => peer.send('ping', Date.now() % 0xffffffff))
+    const peer = peers[Math.floor(Math.random() * peers.length)]
+    if (peer) {
+      peer.averagePing = 9999
+      peer.send('ping', Date.now() % 0xffffffff)
+    }
   }, program.pingInterval * 1000)
 }
 
@@ -153,6 +158,10 @@ if (program.listen.length) {
   })
 
   setInterval(_ => {
-    peers.forEach(peer => peer.send('ping', Date.now() % 0xffffffff))
+    const peer = peers[Math.floor(Math.random() * peers.length)]
+    if (peer) {
+      peer.averagePing = 9999
+      peer.send('ping', Date.now() % 0xffffffff)
+    }
   }, program.pingInterval * 1000)
 }
