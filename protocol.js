@@ -119,7 +119,7 @@ function connect(opts, cb) {
     }
   }
 
-  sock.once('connect', _ => {
+  sock.once('secureConnect', _ => {
     opts.failRetryTimeout = 1000
     cb(ioSocket(sock))
   })
