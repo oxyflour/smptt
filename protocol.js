@@ -76,6 +76,9 @@ function ioSocket(sock) {
     emitter.emit('disconnect')
   })
 
+  let bytesSent = 0,
+    bytesRecv = 0
+
   let rest = new Buffer(0)
   sock.on('data', data => {
     const unpacked = unpack(Buffer.concat([rest, data]))
@@ -83,6 +86,8 @@ function ioSocket(sock) {
       emitter.emit(eventMap[data.evtId], data)
     })
     rest = unpacked.rest
+
+    bytesRecv += data.length
   })
 
   return {
@@ -96,7 +101,20 @@ function ioSocket(sock) {
     send(evtName, connId, packId, body) {
       if (!eventMap[evtName]) throw 'invalid event: ' + evtName
       if (typeof body === 'string') body = Buffer.from(body)
-      sock.write(pack(eventMap[evtName], connId, packId, body))
+
+      const data = pack(eventMap[evtName], connId, packId, body)
+      sock.write(data)
+
+      bytesSent += data.length
+    },
+    destroy() {
+      sock.destroy()
+    },
+    get bytesSent() {
+      return bytesSent
+    },
+    get bytesRecv() {
+      return bytesRecv
     },
     get bufferSize() {
       return sock.bufferSize
