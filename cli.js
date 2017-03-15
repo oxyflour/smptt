@@ -54,6 +54,7 @@ if (program.peer.length && program.forward.length) {
   const pool = createPool(program)
   program.peer.forEach(addr => {
   	protocol.connect(parse(addr), peer => {
+      peer.startupTime = Date.now()
       peer.lastPings = [ ]
       peer.averagePing = program.pingMax * 1000
 
@@ -126,6 +127,7 @@ if (program.listen.length) {
   const pool = createPool(program)
   program.listen.forEach(addr => {
   	protocol.listen(parse(addr), peer => {
+      peer.startupTime = Date.now()
       peer.lastPings = [ ]
       peer.averagePing = program.pingMax * 1000
 
@@ -179,14 +181,19 @@ if (program.listen.length) {
 
 if (program.apiAddress) {
   const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Request-Method', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET')
+    res.setHeader('Access-Control-Allow-Headers', req.header ? req.header.origin : '*')
     const peerStat = peer => ({
+      startup: peer.startupTime,
       addr: peer.urlRemote || peer.addrRemote,
       ping: peer.averagePing,
       sent: peer.bytesSent,
       recv: peer.bytesRecv,
     })
     res.end(JSON.stringify({
-      pingMax: program.pingMax,
+      pingMax: program.pingMax * 1000,
       version: packageJson.version,
       server: serverPeers.map(peerStat),
       client: clientPeers.map(peerStat),
