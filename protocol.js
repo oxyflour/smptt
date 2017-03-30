@@ -1,8 +1,7 @@
 'use strict'
 
 const tls = require('tls'),
-  EventEmitter = require('events'),
-  debug = require('debug')
+  EventEmitter = require('events')
 
 const MAGIC = 0xabcd,
   HEAD_LENGTH = 16
@@ -131,16 +130,19 @@ function connect(opts, cb) {
   let isDestroyed = false
   function retryConnect() {
     if (!isDestroyed) {
-      sock.destroy()
       isDestroyed = true
+      sock.destroy()
       setTimeout(_ => connect(opts, cb), opts.failRetryTimeout || 1000)
     }
   }
 
+  let connectTimeout = setTimeout(retryConnect, 30000)
   sock.once('secureConnect', _ => {
     opts.failRetryTimeout = 1000
+    clearTimeout(connectTimeout)
     cb(ioSocket(sock))
   })
+
   sock.once('error', err => {
     opts.failRetryTimeout = Math.min((opts.failRetryTimeout || 1000) * 2, 30000)
     console.error(new Date(), err, `retry in ${opts.failRetryTimeout / 1000} seconds`)

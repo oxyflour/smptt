@@ -41,7 +41,7 @@ function parse(addr) {
 	const st = addr.split(':'),
     port = +st.pop(),
     host = st.pop(),
-    servername = host
+    servername = st.pop() || host
 	return {
 		pfx, port, host, servername,
 		requestCert: true,
