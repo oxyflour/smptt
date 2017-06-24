@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title></title>
+</head>
+<body style="padding: 5px; margin: 0; max-width: 800px">
+display <select id="showDuration">
+  <option>60</option>
+  <option>120</option>
+  <option>600</option>
+  <option>1200</option>
+</select> seconds
+<h3>Latency (ms)</h3>
+<canvas id="pingChart"></canvas>
+<h3>Traffic (bytes)</h3>
+<canvas id="trafficChart"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.bundle.js"></script>
+<script>
+const LINE_COLORS = '#3cba54/#f4c20d/#db3236/#4885ed/red/blue/green/yellow/cyan/black/pink'.split('/'),
+  MAX_POINTS = 1200
+
+const lineData = { /* clientId: data */ }
+function updateLineData(data) {
+  const conns = { }
+  for (const client of data.client.concat(data.server)) {
+    const id = client.addr + '@' + client.startup
+    conns[id] = client
+    if (!lineData[id]) {
+      const color = LINE_COLORS.find(color => !Object.keys(lineData).some(id => lineData[id].color === color))
+      lineData[id] = {
+        color,
+        addr: client.addr,
+        pings: Array(MAX_POINTS).fill(NaN),
+        lastSent: NaN,
+        sent: Array(MAX_POINTS).fill(NaN),
+        lastRecv: NaN,
+        recv: Array(MAX_POINTS).fill(NaN),
+      }
+    }
+  }
+  for (const id of Object.keys(lineData)) {
+    const client = conns[id],
+      line = lineData[id]
+    line.pings.push(client && client.ping !== data.pingMax ? client.ping : NaN)
+
+    const sent = client && client.sent || NaN
+    line.sent.push(sent - line.lastSent)
+    line.lastSent = sent
+
+    const recv = client && client.recv || NaN
+    line.recv.push(recv - line.lastRecv)
+    line.lastRecv = recv
+
+    for (const array of [line.pings, line.sent, line.recv]) {
+      if (array.length > MAX_POINTS * 2) {
+        array.splice(0, MAX_POINTS)
+      }
+    }
+    if (line.pings.every(ping => ping !== ping)) {
+      delete lineData[id]
+    }
+  }
+}
+
+const pingChart = new Chart(document.getElementById('pingChart'), {
+  type: 'line',
+  data: { labels: [ ], datasets: [ ] }
+})
+const trafficChart = new Chart(document.getElementById('trafficChart'), {
+  type: 'line',
+  data: { labels: [ ], datasets: [ ] }
+})
+
+function updateLineChart(size) {
+  size = Math.min(size, 1000)
+
+  for (const chart of [pingChart, trafficChart]) {
+    if (chart.data.labels.length !== size) {
+      chart.data.labels = Array(size).fill(0).map((_, i) => i % 10 === 0 ? i : '').reverse()
+    }
+  }
+
+  pingChart.data.datasets = Object.keys(lineData).map(id => ({
+    fill: false,
+    pointRadius: 1,
+    spanGaps: true,
+    label: lineData[id].addr,
+    borderColor: lineData[id].color,
+    data: lineData[id].pings.slice(-size),
+  }))
+  pingChart.update(0)
+
+  trafficChart.data.datasets = Object.keys(lineData).map(id => ({
+    fill: false,
+    pointRadius: 1,
+    spanGaps: true,
+    borderDash: [5, 5],
+    label: lineData[id].addr + '(sent)',
+    borderColor: lineData[id].color,
+    data: lineData[id].sent.slice(-size),
+  })).concat(Object.keys(lineData).map(id => ({
+    fill: false,
+    pointRadius: 1,
+    spanGaps: true,
+    label: lineData[id].addr + '(recv)',
+    borderColor: lineData[id].color,
+    data: lineData[id].recv.slice(-size),
+  })))
+  trafficChart.update(0)
+}
+
+setInterval(_ => fetch('status.json').then(res => res.json()).then(data => {
+  updateLineData(data)
+  updateLineChart(parseFloat(document.getElementById('showDuration').value))
+}), 1000)
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 'use strict'
 
 const net = require('net'),
-	fs = require('fs'),
+  fs = require('fs'),
   http = require('http'),
   program = require('commander'),
   packageJson = require('./package.json'),
@@ -38,22 +38,22 @@ if (!fs.existsSync(program.pfx)) {
 
 const pfx = fs.readFileSync(program.pfx)
 function parse(addr) {
-	const st = addr.split(':'),
+  const st = addr.split(':'),
     port = +st.pop(),
     host = st.pop(),
     servername = st.pop() || host
-	return {
-		pfx, port, host, servername,
-		requestCert: true,
-		rejectUnauthorized: true,
-	}
+  return {
+    pfx, port, host, servername,
+    requestCert: true,
+    rejectUnauthorized: true,
+  }
 }
 
 const clientPeers = [ ]
 if (program.peer.length && program.forward.length) {
   const pool = createPool(program)
   program.peer.forEach(addr => {
-  	protocol.connect(parse(addr), peer => {
+    protocol.connect(parse(addr), peer => {
       peer.startupTime = Date.now()
       peer.lastPings = [ ]
       peer.averagePing = program.pingMax * 1000
@@ -97,8 +97,8 @@ if (program.peer.length && program.forward.length) {
   const forwarding = { }
   program.forward.forEach(forward => {
     const st = forward.split(':'),
-    	port = st.pop(), host = st.pop(),
-    	addr = host + ':' + port
+      port = st.pop(), host = st.pop(),
+      addr = host + ':' + port
 
     const server = net.createServer(sock => {
       const id = Math.floor(Math.random() * 0xffffffff),
@@ -126,7 +126,7 @@ const serverPeers = [ ]
 if (program.listen.length) {
   const pool = createPool(program)
   program.listen.forEach(addr => {
-  	protocol.listen(parse(addr), peer => {
+    protocol.listen(parse(addr), peer => {
       peer.startupTime = Date.now()
       peer.lastPings = [ ]
       peer.averagePing = program.pingMax * 1000
@@ -181,23 +181,29 @@ if (program.listen.length) {
 
 if (program.apiAddress) {
   const server = http.createServer((req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Request-Method', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET')
-    res.setHeader('Access-Control-Allow-Headers', req.header ? req.header.origin : '*')
-    const peerStat = peer => ({
-      startup: peer.startupTime,
-      addr: peer.urlRemote || peer.addrRemote,
-      ping: peer.averagePing,
-      sent: peer.bytesSent,
-      recv: peer.bytesRecv,
-    })
-    res.end(JSON.stringify({
-      pingMax: program.pingMax * 1000,
-      version: packageJson.version,
-      server: serverPeers.map(peerStat),
-      client: clientPeers.map(peerStat),
-    }, null, 2))
+    if (req.url === '/') {
+      res.setHeader('Content-Type', 'text/html')
+      fs.createReadStream(__dirname + '/monitor.html').pipe(res)
+    }
+    else if (req.url === '/status.json') {
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Request-Method', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET')
+      res.setHeader('Access-Control-Allow-Headers', req.header ? req.header.origin : '*')
+      const peerStat = peer => ({
+        startup: peer.startupTime,
+        addr: peer.urlRemote || peer.addrRemote,
+        ping: peer.averagePing,
+        sent: peer.bytesSent,
+        recv: peer.bytesRecv,
+      })
+      res.end(JSON.stringify({
+        pingMax: program.pingMax * 1000,
+        version: packageJson.version,
+        server: serverPeers.map(peerStat),
+        client: clientPeers.map(peerStat),
+      }, null, 2))
+    }
   })
   const st = program.apiAddress.split(':')
   st.length > 1 ? server.listen(st[1], st[0]) : server.listen(st[0])
