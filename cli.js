@@ -65,12 +65,12 @@ if (program.peer.length && program.forward.length) {
 
       peer.on('error', err => {
         console.log('[C] error from ' + addr + ': ', err)
-        clientPeers.splice(clientPeers.indexOf(peer), 1)
+        clientPeers.indexOf(peer) >= 0 && clientPeers.splice(clientPeers.indexOf(peer), 1)
         pool.eachConn(conn => conn.remove(peer))
       })
       peer.on('disconnect', _ => {
         console.log('[C] disconnected from ' + addr)
-        clientPeers.splice(clientPeers.indexOf(peer), 1)
+        clientPeers.indexOf(peer) >= 0 && clientPeers.splice(clientPeers.indexOf(peer), 1)
         pool.eachConn(conn => conn.remove(peer))
       })
 
@@ -80,7 +80,6 @@ if (program.peer.length && program.forward.length) {
       peer.recv('pong', tick => {
         peer.lastPings = peer.lastPings.concat(Date.now() % 0xffffffff - tick).slice(-5)
         peer.averagePing = peer.lastPings.reduce((a, b) => a + b, 0) / peer.lastPings.length
-        peer.killTimeout && clearTimeout(peer.killTimeout)
       })
       peer.recv('data', (id, index, body) => {
         pool.has(id) && pool.open(id).recv(index, body, peer)
@@ -116,9 +115,11 @@ if (program.peer.length && program.forward.length) {
     if (peer) {
       peer.averagePing = program.pingMax * 1000
       peer.send('ping', Date.now() % 0xffffffff)
-      peer.killTimeout && clearTimeout(peer.killTimeout)
-      peer.killTimeout = setTimeout(_ => peer.destroy(), peer.averagePing)
     }
+    const now = Date.now()
+    clientPeers.forEach(peer => {
+      now - peer.lastActive > program.pingMax * 1000 && peer.destroy()
+    })
   }, program.pingInterval * 1000)
 }
 
@@ -137,12 +138,12 @@ if (program.listen.length) {
 
       peer.on('error', err => {
         console.log('[S] error from ' + addr + ': ', err)
-        serverPeers.splice(serverPeers.indexOf(peer), 1)
+        serverPeers.indexOf(peer) >= 0 && serverPeers.splice(serverPeers.indexOf(peer), 1)
         pool.eachConn(conn => conn.remove(peer))
       })
       peer.on('disconnect', _ => {
         console.log('[S] peer disconnected from ', addr)
-        serverPeers.splice(serverPeers.indexOf(peer), 1)
+        serverPeers.indexOf(peer) >= 0 && serverPeers.splice(serverPeers.indexOf(peer), 1)
         pool.eachConn(conn => conn.remove(peer))
       })
 
@@ -176,6 +177,10 @@ if (program.listen.length) {
       peer.averagePing = program.pingMax * 1000
       peer.send('ping', Date.now() % 0xffffffff)
     }
+    const now = Date.now()
+    serverPeers.forEach(peer => {
+      now - peer.lastActive > program.pingMax * 1000 && peer.destroy()
+    })
   }, program.pingInterval * 1000)
 }
 

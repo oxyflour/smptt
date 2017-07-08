@@ -69,6 +69,7 @@ function ioSocket(sock) {
 
   sock.on('error', err => {
     emitter.emit('error', err)
+    sock.destroy()
   })
 
   sock.once('close', _ => {
@@ -76,7 +77,8 @@ function ioSocket(sock) {
   })
 
   let bytesSent = 0,
-    bytesRecv = 0
+    bytesRecv = 0,
+    lastActive = Date.now()
 
   let rest = new Buffer(0)
   sock.on('data', data => {
@@ -87,6 +89,7 @@ function ioSocket(sock) {
     rest = unpacked.rest
 
     bytesRecv += data.length
+    lastActive = Date.now()
   })
 
   return {
@@ -105,6 +108,7 @@ function ioSocket(sock) {
       sock.write(data)
 
       bytesSent += data.length
+      lastActive = Date.now()
     },
     destroy() {
       sock.destroy()
@@ -115,12 +119,15 @@ function ioSocket(sock) {
     get bytesRecv() {
       return bytesRecv
     },
+    get lastActive() {
+      return lastActive
+    },
     get bufferSize() {
       return sock.bufferSize
     },
     get addrRemote() {
       return sock.remoteAddress + ':' + sock.remotePort
-    }
+    },
   }
 }
 
