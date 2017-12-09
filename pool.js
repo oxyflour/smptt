@@ -198,6 +198,15 @@ function createConn(id, sock, opts) {
 }
 
 function createPool(opts) {
+  opts = Object.assign({
+    idleTimeout: 30,
+    ioFlushInterval: 5,
+    ioMaxBufferSize: 40,
+    ioMinBufferSize: 30,
+    sockAcknowledgeInterval: 4,
+    sockMaxAcknowledgeOffset: 64,
+  }, opts)
+
   const log = debug('smptt:POOL')
   log('init')
 

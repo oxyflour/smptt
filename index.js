@@ -8,6 +8,14 @@ const net = require('net'),
   protocol = require('./protocol')
 
 module.exports = function(options) {
+  options = Object.assign({
+    peer: [ ],
+    forward: [ ],
+    listen: [ ],
+    pintMax: 30,
+    pingInterval: 1,
+  }, options)
+
   const pfx = fs.readFileSync(options.pfx)
   function parseAddr(addr) {
     const st = addr.split(':'),
