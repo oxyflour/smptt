@@ -181,13 +181,15 @@ module.exports = function(options) {
         }, null, 2))
       }
       else if (req.url === '/metrics') {
-        res.end([
-          serverPeers.concat(clientPeers).map(peer => [
-            `ping_milliseconds{addr=${peer.urlRemote || peer.addrRemote}} ${peer.averagePing}`,
-            `sent_bytes{addr=${peer.addrRemote}} ${peer.sent}`,
-            `recv_bytes{addr=${peer.addrRemote}} ${peer.recv}`,
-          ].join('\n')).join('\n'),
-        ].join('\n'))
+        res.end([]
+          .concat(serverPeers.map(peer => ({ peer, type: 'server', url: peer.urlRemote || peer.addrRemote })))
+          .concat(clientPeers.map(peer => ({ peer, type: 'client', url: peer.urlRemote || peer.addrRemote })))
+          .map(({ peer, type, url }) => [
+              `smptt_${type}_ping_milliseconds{addr="${url}"} ${peer.averagePing}`,
+              `smptt_${type}_sent_bytes{addr="${url}"} ${peer.bytesSent}`,
+              `smptt_${type}_recv_bytes{addr="${url}"} ${peer.bytesRecv}`,
+          ].join('\n'))
+          .join('\n') + '\n')
       }
     })
     const st = options.apiAddress.split(':')
