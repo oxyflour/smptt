@@ -180,6 +180,15 @@ module.exports = function(options) {
           client: clientPeers.map(peerStat),
         }, null, 2))
       }
+      else if (req.url === '/metrics') {
+        res.end([
+          serverPeers.concat(clientPeers).map(peer => [
+            `ping_milliseconds{addr=${peer.urlRemote || peer.addrRemote}} ${peer.averagePing}`,
+            `sent_bytes{addr=${peer.addrRemote}} ${peer.sent}`,
+            `recv_bytes{addr=${peer.addrRemote}} ${peer.recv}`,
+          ].join('\n')).join('\n'),
+        ].join('\n'))
+      }
     })
     const st = options.apiAddress.split(':')
     st.length > 1 ? server.listen(st[1], st[0]) : server.listen(st[0])
