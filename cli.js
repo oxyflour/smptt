@@ -21,6 +21,7 @@ program
   .option('--io-min-buffer-size <integer>', 'default 30', parseFloat, 30)
   .option('--sock-acknowledge-interval <integer>', 'send acknowledge message to another side every * packages. default 4', parseFloat, 4)
   .option('--sock-max-acknowledge-offset <integer>', 'pause socket until last message received. default 64', parseFloat, 64)
+  .option('--sock-select-max-ping <integer>', 'ignore sockets ping of which greater than, default 30s', parseFloat, 30)
   .parse(process.argv)
 
 if (!program.listen.length && !(program.peer.length && program.forward.length)) {

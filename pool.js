@@ -52,7 +52,11 @@ function createConn(id, sock, opts) {
   }
 
   function select() {
-    peers.forEach(peer => peer.selectOrder = (peer.bufferSize + 1 + Math.random() * 0.1) * (peer.averagePing || 1000))
+    peers.forEach(peer => {
+      peer.selectOrder =
+        (peer.bufferSize + 1 + Math.random() * 0.1) *
+        (peer.averagePing > opts.sockSelectMaxPing * 1000 ? 1e9 : (peer.averagePing || 10000))
+    })
     return peers.sort((a, b) => a.selectOrder - b.selectOrder)[0]
   }
 
