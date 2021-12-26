@@ -9,7 +9,7 @@ const fs = require('fs'),
 
 program
   .version(packageJson.version)
-  .option('-c, --config-file', 'load from config file. an array of config is supported.')
+  .option('-c, --config-file <config>', 'load from config file. an array of config is supported.')
   .option('-F, --forward <[host:]port:remoteHost:remotePort>', 'forward host:port to remoteHost:remotePort', (r, p) => p.concat(r), [ ])
   .option('-R, --reverse <[remoteHost:]remotePort:host:port>', 'listen at remoteHost:remotePort and forward host:port', (r, p) => p.concat(r), [ ])
   .option('-P, --peer <[host:]port>', 'server address, required as client', (r, p) => p.concat(r), [ ])
