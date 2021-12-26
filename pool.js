@@ -1,3 +1,4 @@
+// @ts-check
 'use strict'
 
 const net = require('net'),
@@ -8,26 +9,54 @@ function hex(id) {
 }
 
 function throttle(fn, interval) {
+  /**
+   * @type { any }
+   */
   let timeout = 0
-  return function() {
+  return function(...args) {
     timeout = timeout || setTimeout(_ => {
       timeout = 0
-      fn.apply(this, arguments)
+      fn.apply(this, args)
     }, interval)
   }
 }
 
 function debounce(fn, delay) {
+  /**
+   * @type { any }
+   */
   let timeout = 0
-  return function() {
+  return function(...args) {
     timeout && clearTimeout(timeout)
     timeout = setTimeout(_ => {
       timeout = 0
-      fn.apply(this, arguments)
+      fn.apply(this, args)
     }, delay)
   }
 }
 
+/**
+ * @typedef { import('./protocol').Sock } Sock
+ */
+
+/**
+ * 
+ * @typedef { Object } ConnOpts 
+ * @property { number } ConnOpts.sockSelectMaxPing
+ * @property { number } ConnOpts.sockMaxAcknowledgeOffset
+ * @property { number } ConnOpts.sockAcknowledgeInterval
+ * @property { number } ConnOpts.ioMaxBufferSize
+ * @property { number } ConnOpts.ioMinBufferSize
+ * @property { number } ConnOpts.ioFlushInterval
+ */
+
+/**
+ * 
+ * @param { number } id 
+ * @param { net.Socket } sock 
+ * @param { ConnOpts } opts 
+ * @returns 
+ */
 function createConn(id, sock, opts) {
   const log = debug('smptt:' + hex(id))
   log('init')
@@ -38,7 +67,16 @@ function createConn(id, sock, opts) {
     peerSentCount = { },
     peerRecvCount = { }
 
+  /**
+   * @type { Sock[] }
+   */
   const peers = [ ]
+
+  /**
+   * 
+   * @param { Sock } peer 
+   * @returns { Sock }
+   */
   function add(peer) {
     lastActive = Date.now()
     if (peers.indexOf(peer) === -1) {
@@ -47,10 +85,18 @@ function createConn(id, sock, opts) {
     return peer
   }
 
+  /**
+   * 
+   * @param { Sock } peer 
+   */
   function remove(peer) {
     peers.splice(peers.indexOf(peer), 1)
   }
 
+  /**
+   * 
+   * @returns { Sock }
+   */
   function select() {
     peers.forEach(peer => {
       peer.selectOrder =
@@ -80,6 +126,10 @@ function createConn(id, sock, opts) {
     }
   }, opts.ioFlushInterval)
 
+  /**
+   * 
+   * @param { number } index 
+   */
   function rescue(index) {
     const buf = ioBuffer.find(buf => buf.index === index),
       peer = buf && select()
@@ -130,6 +180,12 @@ function createConn(id, sock, opts) {
 
   const netBuffer = { }
   let netBufIndex = 0
+  /**
+   * 
+   * @param { number } index 
+   * @param { Buffer } buf 
+   * @param { Sock } peer 
+   */
   function recv(index, buf, peer) {
     lastActive = Date.now()
 
@@ -155,6 +211,10 @@ function createConn(id, sock, opts) {
   }
 
   let ioMaxAckIndex = 0
+  /**
+   * 
+   * @param { number } index 
+   */
   function acknowledge(index) {
     ioMaxAckIndex = Math.max(index, ioMaxAckIndex)
     if (ioBufIndex < ioMaxAckIndex + opts.sockMaxAcknowledgeOffset && isPaused) {
@@ -201,6 +261,11 @@ function createConn(id, sock, opts) {
   }
 }
 
+/**
+ * 
+ * @typedef { ReturnType<createConn> } Conn 
+ */
+
 function createPool(opts) {
   opts = Object.assign({
     idleTimeout: 30,
@@ -214,6 +279,9 @@ function createPool(opts) {
   const log = debug('smptt:POOL')
   log('init')
 
+  /**
+   * @type { Record<string, Conn> }
+   */
   const conns = { }
 
   function check() {
@@ -229,11 +297,22 @@ function createPool(opts) {
     })
   }
 
+  /**
+   * 
+   * @param { number } id 
+   * @returns { boolean }
+   */
   function has(id) {
     const key = hex(id)
     return !!conns[key]
   }
 
+  /**
+   * 
+   * @param { number } id 
+   * @param { string | net.Socket } [sock]
+   * @returns { Conn }
+   */
   function open(id, sock) {
     const key = hex(id)
     if (!conns[key]) {
@@ -248,6 +327,10 @@ function createPool(opts) {
     return conns[key]
   }
 
+  /**
+   * 
+   * @param { (sock: Conn, id: number) => void } fn 
+   */
   function eachConn(fn) {
     Object.keys(conns).forEach(id => fn(conns[id], parseInt(id, 16)))
   }

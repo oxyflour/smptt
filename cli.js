@@ -2,13 +2,16 @@
 'use strict'
 
 const fs = require('fs'),
+  path = require('path'),
   program = require('commander'),
   packageJson = require('./package.json'),
   startServer = require('./')
 
 program
   .version(packageJson.version)
-  .option('-F, --forward <[host:]port:remoteHost:remotePort>', 'forward host:port to remoteHost:remotePort, required as client', (r, p) => p.concat(r), [ ])
+  .option('-c, --config-file', 'load from config file. an array of config is supported.')
+  .option('-F, --forward <[host:]port:remoteHost:remotePort>', 'forward host:port to remoteHost:remotePort', (r, p) => p.concat(r), [ ])
+  .option('-R, --reverse <[remoteHost:]remotePort:host:port>', 'listen at remoteHost:remotePort and forward host:port', (r, p) => p.concat(r), [ ])
   .option('-P, --peer <[host:]port>', 'server address, required as client', (r, p) => p.concat(r), [ ])
   .option('-l, --listen <[host:]port>', 'listen address, required as server', (r, p) => p.concat(r), [ ])
   .option('--pfx <string>', 'pfx file path, required')
@@ -24,7 +27,7 @@ program
   .option('--sock-select-max-ping <integer>', 'ignore sockets ping of which greater than, default 30s', parseFloat, 30)
   .parse(process.argv)
 
-if (!program.listen.length && !(program.peer.length && program.forward.length)) {
+if (!program.listen.length && !program.peer.length) {
   program.outputHelp()
   process.exit(-1)
 }
@@ -35,4 +38,6 @@ if (!fs.existsSync(program.pfx)) {
   process.exit(-1)
 }
 
-startServer(program)
+const config = program.configFile ? require(path.resolve(program.configFile)) : { },
+  configList = Array.isArray(config) ? config : [config]
+configList.forEach(config => startServer({ ...program, ...config }))

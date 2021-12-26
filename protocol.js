@@ -1,3 +1,4 @@
+// @ts-check
 'use strict'
 
 const tls = require('tls'),
@@ -6,14 +7,29 @@ const tls = require('tls'),
 const MAGIC = 0xabcd,
   HEAD_LENGTH = 16
 
+/**
+ * @typedef { 'ping' | 'pong' | 'open' | 'data' | 'req' | 'ack' | 'listen'  } MsgTypes
+ */
+
+/**
+ * @type { Record<string, number> | Record<number, string> }
+ */
 const eventMap = { }
-'ping/pong/open/data/req/ack'.split('/').forEach((name, index) => {
+'ping/pong/open/data/req/ack/listen'.split('/').forEach((name, index) => {
   eventMap[name] = index + 10
   eventMap[index + 10] = name
 })
 
+/**
+ * 
+ * @param { number } evtId
+ * @param { number } [connId]
+ * @param { number } [packId]
+ * @param { Buffer } [body]
+ * @returns 
+ */
 function pack(evtId, connId, packId, body) {
-  const head = new Buffer(HEAD_LENGTH)
+  const head = Buffer.alloc(HEAD_LENGTH)
   head.writeUInt16LE(MAGIC,  0)
   head.writeUInt16LE(evtId,  2)
   head.writeUInt32LE(connId || 0, 4)
@@ -21,13 +37,17 @@ function pack(evtId, connId, packId, body) {
   if (body) {
     head.writeUInt32LE(body.length, 12)
     return Buffer.concat([head, body], body.length + head.length)
-  }
-  else {
+  } else {
     head.writeUInt32LE(0, 12)
     return head
   }
 }
 
+/**
+ * 
+ * @param { Buffer } chunk 
+ * @returns 
+ */
 function unpack(chunk) {
   const packages = [ ]
 
@@ -64,6 +84,11 @@ function unpack(chunk) {
   return { packages, rest }
 }
 
+/**
+ * 
+ * @param { import('net').Socket } sock 
+ * @returns
+ */
 function ioSocket(sock) {
   const emitter = new EventEmitter()
 
@@ -80,7 +105,7 @@ function ioSocket(sock) {
     bytesRecv = 0,
     lastActive = Date.now()
 
-  let rest = new Buffer(0)
+  let rest = Buffer.alloc(0)
   sock.on('data', data => {
     const unpacked = unpack(Buffer.concat([rest, data]))
     unpacked.packages.forEach(data => {
@@ -93,15 +118,32 @@ function ioSocket(sock) {
   })
 
   return {
+    /**
+     * 
+     * @param { string } evtName 
+     * @param { (data: any) => void } cb 
+     */
     on(evtName, cb) {
       emitter.on(evtName, cb)
     },
+    /**
+     * 
+     * @param { MsgTypes } evtName 
+     * @param { (connId: number, packId: number, body: Buffer) => void } cb 
+     */
     recv(evtName, cb) {
-      if (!eventMap[evtName]) throw 'invalid event: ' + evtName
+      if (!eventMap[evtName]) throw Error('invalid event: ' + evtName)
       emitter.on(evtName, evt => cb(evt.connId, evt.packId, evt.body))
     },
+    /**
+     * 
+     * @param { MsgTypes } evtName 
+     * @param { number } connId 
+     * @param { number } [packId]
+     * @param { string | Buffer } [body]
+     */
     send(evtName, connId, packId, body) {
-      if (!eventMap[evtName]) throw 'invalid event: ' + evtName
+      if (!eventMap[evtName]) throw Error('invalid event: ' + evtName)
       if (typeof body === 'string') body = Buffer.from(body)
 
       const data = pack(eventMap[evtName], connId, packId, body)
@@ -131,6 +173,16 @@ function ioSocket(sock) {
   }
 }
 
+/**
+ * 
+ * @typedef { ReturnType<ioSocket> } Sock 
+ */
+
+/**
+ * 
+ * @param { } opts 
+ * @param { (sock: Sock) => void } cb 
+ */
 function connect(opts, cb) {
   const sock = tls.connect(opts)
 
@@ -160,6 +212,11 @@ function connect(opts, cb) {
   })
 }
 
+/**
+ * 
+ * @param { } opts 
+ * @param { (sock: Sock) => void } cb 
+ */
 function listen(opts, cb) {
   const server = tls.createServer(opts, sock => {
     cb(ioSocket(sock))
