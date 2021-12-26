@@ -27,13 +27,7 @@ program
   .option('--sock-select-max-ping <integer>', 'ignore sockets ping of which greater than, default 30s', parseFloat, 30)
   .parse(process.argv)
 
-if (!program.listen.length && !program.peer.length) {
-  program.outputHelp()
-  process.exit(-1)
-}
-
-if (!fs.existsSync(program.pfx)) {
-  console.error('pfx file is required!')
+if (!program.listen.length && !program.peer.length && !program.configFile) {
   program.outputHelp()
   process.exit(-1)
 }
